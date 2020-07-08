@@ -9,8 +9,8 @@ namespace ConsoleApp97
     {
         static void Main(string[] args)
         {
-            var supportedWriter = new LoggingTextWriter(ConsoleFormatInfo.AnsiSupportedInfo);
-            var notSupportedWriter = new LoggingTextWriter(ConsoleFormatInfo.AnsiNotSupportedInfo);
+            var supportedWriter = new LoggingTextWriter(new ConsoleFormatInfo() { SupportsAnsiCodes = true });
+            var notSupportedWriter = new LoggingTextWriter(new ConsoleFormatInfo() { SupportsAnsiCodes = false });
 
             var consoleLogFormatter = new PrettyConsoleLogFormatter();
             consoleLogFormatter.Write<object>(LogLevel.Information, "CA100", default, new object(), null, (o, e) => "state string result", null, supportedWriter);
@@ -20,7 +20,7 @@ namespace ConsoleApp97
             Console.WriteLine();
 
             // test writing to the console directly
-            Console.WriteLine($"{Ansi.Color.Foreground.Green}Console test{Ansi.Color.Foreground.Default}");
+            Console.WriteLine($"{Ansi.Color.Foreground.Green}Console {Ansi.Color.Foreground.LightYellow}test{Ansi.Color.Foreground.Default}");
         }
     }
 

@@ -1,13 +1,17 @@
-﻿namespace System
+﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+
+using System.Runtime.InteropServices;
+
+namespace System
 {
     public sealed class ConsoleFormatInfo : IFormatProvider
     {
-        private static ConsoleFormatInfo s_ansiSupportedInfo;
-        private static ConsoleFormatInfo s_ansiNotSupportedInfo;
+        private static ConsoleFormatInfo s_currentInfo;
         private bool _isReadOnly;
         private bool _supportsAnsiCodes;
 
-        private ConsoleFormatInfo()
+        public ConsoleFormatInfo()
         {
         }
 
@@ -15,16 +19,19 @@
         {
             get
             {
-                // TODO: read this from the Console
-                return AnsiSupportedInfo;
+                return s_currentInfo ??=
+                    InitializeCurrentInfo();
+            }
+            set
+            {
+                if (value == null)
+                {
+                    throw new ArgumentNullException(nameof(value));
+                }
+
+                s_currentInfo = ReadOnly(value);
             }
         }
-
-        public static ConsoleFormatInfo AnsiSupportedInfo => s_ansiSupportedInfo ??=
-            new ConsoleFormatInfo { _isReadOnly = true, _supportsAnsiCodes = true };
-
-        public static ConsoleFormatInfo AnsiNotSupportedInfo => s_ansiNotSupportedInfo ??=
-            new ConsoleFormatInfo { _isReadOnly = true, _supportsAnsiCodes = false };
 
         public bool SupportsAnsiCodes
         {
@@ -35,6 +42,8 @@
                 _supportsAnsiCodes = value;
             }
         }
+
+        public bool IsReadOnly => _isReadOnly;
 
         public static ConsoleFormatInfo GetInstance(IFormatProvider formatProvider)
         {
@@ -54,11 +63,60 @@
         public object GetFormat(Type formatType) =>
             formatType == typeof(ConsoleFormatInfo) ? this : null;
 
+        public static ConsoleFormatInfo ReadOnly(ConsoleFormatInfo cfi)
+        {
+            if (cfi == null)
+            {
+                throw new ArgumentNullException(nameof(cfi));
+            }
+
+            if (cfi.IsReadOnly)
+            {
+                return cfi;
+            }
+
+            ConsoleFormatInfo info = (ConsoleFormatInfo)(cfi.MemberwiseClone());
+            info._isReadOnly = true;
+            return info;
+        }
+
+        private static ConsoleFormatInfo InitializeCurrentInfo()
+        {
+            bool supportsAnsi =
+                !Console.IsOutputRedirected &&
+                DoesOperatingSystemSupportAnsi();
+
+            return new ConsoleFormatInfo()
+            {
+                _isReadOnly = true,
+                _supportsAnsiCodes = supportsAnsi
+            };
+        }
+
+        private static bool DoesOperatingSystemSupportAnsi()
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return true;
+            }
+
+            // for Windows, check the console mode
+            var stdOutHandle = Interop.GetStdHandle(Interop.STD_OUTPUT_HANDLE);
+            uint consoleMode;
+
+            if (!Interop.GetConsoleMode(stdOutHandle, out consoleMode))
+            {
+                return false;
+            }
+
+            return (consoleMode & Interop.ENABLE_VIRTUAL_TERMINAL_PROCESSING) == Interop.ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        }
+
         private void VerifyWritable()
         {
             if (_isReadOnly)
             {
-                throw new InvalidOperationException("ReadOnly");
+                throw new InvalidOperationException("Instance is read-only.");
             }
         }
     }
